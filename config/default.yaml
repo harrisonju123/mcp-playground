@@ -1,0 +1,10 @@
+server:
+  port: 50051
+  enable_reflection: true     # dev default
+
+registry:
+  source: yaml
+  path: ./servers.yaml
+
+observability:
+  otel_endpoint: ""           # no OTEL in dev

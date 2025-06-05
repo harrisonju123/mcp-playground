@@ -1,0 +1,6 @@
+server:
+  enable_reflection: true
+registry:
+  source: postgres
+observability:
+  otel_endpoint: "otel-collector.staging:4317"

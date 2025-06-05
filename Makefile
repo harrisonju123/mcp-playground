@@ -1,19 +1,63 @@
-GO_BIN=mcpxd
+# ---------------------------------------------------------------------
+# Makefile – workspace-friendly dev helpers for mcp-agent-poc
+# ---------------------------------------------------------------------
 
-.PHONY: dev test lint docker
+# 1) List every Go module directory that should be vetted / tested.
+GO_MODULES := $(shell go work edit -json | jq -r '.Use[].DiskPath')
 
-dev:                                     ## Local dev loop
-	air -c .air.toml & pnpm --prefix web dev
+# 2) Name of the daemon binary and Docker image tag
+GO_BIN      := mcpxd
+IMAGE_TAG   := $(GO_BIN):dev
 
-test:                                    ## Run all tests
-	go test ./...
-	pnpm --prefix web test --if-present
+# ---------------------------------------------------------------------
+# Targets
+# ---------------------------------------------------------------------
 
+.PHONY: dev gotest govet lint docker clean gen
+
+## dev – run backend and frontend in watch-mode
+dev:
+	# Backend hot-reload (uncomment Air if you use it)
+	# air &
+	go run ./cmd/mcpxd &                      \
+	pnpm --prefix web dev
+
+## gotest – run go test in every module
+gotest:
+	@for m in $(GO_MODULES); do \
+		echo "› go test $$m/..."; \
+		go test $$m/...; \
+	done
+
+## govet – run go vet in every module
+govet:
+	@for m in $(GO_MODULES); do \
+		echo "› go vet $$m/..."; \
+		go vet $$m/...; \
+	done
+
+## lint – golangci-lint + eslint
 lint:
-	golangci-lint run ./...
-	pnpm --prefix web lint --fix
+	golangci-lint run ./...            # Go
+	pnpm --prefix web lint --fix       # Web
 
+## docker – build distroless image containing the daemon
 docker:
-	docker build -f Dockerfile.daemon -t $(GO_BIN):dev .
+	docker build -f Dockerfile.daemon -t $(IMAGE_TAG) .
+
+## clean – tidy modules & remove Docker image
+clean:
+	@for m in $(GO_MODULES); do \
+		( cd $$m && go mod tidy ); \
+	done
+	docker rmi -f $(IMAGE_TAG) || true
+
+gen:
+	@echo "🔄  Running go generate for all proto‐generate directives…"
+	protoc \
+      --proto_path=api \
+      --go_out=api/gen --go_opt=paths=source_relative \
+      --go-grpc_out=api/gen --go-grpc_opt=paths=source_relative \
+      api/aggregator.proto
 
 .DEFAULT_GOAL := dev

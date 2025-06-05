@@ -1,0 +1,31 @@
+
+syntax = "proto3";
+
+package aggregator;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/harrisonju123/mcp-agent-poc/api/gen/aggregator;aggregator";
+
+service Aggregator {
+  rpc ListTools (ListToolsRequest) returns (ListToolsResponse);
+  rpc CallTool (CallToolRequest) returns (CallToolResponse);
+}
+
+message ListToolsRequest {}
+message ToolInfo {
+  string name = 1;
+  string description = 2;
+}
+message ListToolsResponse {
+  repeated ToolInfo tools = 1;
+}
+
+message CallToolRequest {
+  string name = 1;
+  google.protobuf.Struct args_json = 2;
+}
+
+message CallToolResponse {
+  google.protobuf.Struct result_json = 1;
+}
