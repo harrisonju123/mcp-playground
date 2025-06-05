@@ -5,8 +5,8 @@ import (
 	"fmt"
 	pb "github.com/harrisonju123/mcp-agent-poc/api/gen"
 	"github.com/harrisonju123/mcp-agent-poc/config"
-	"github.com/harrisonju123/mcp-agent-poc/router"
-	"github.com/harrisonju123/mcp-agent-poc/server"
+	"github.com/harrisonju123/mcp-agent-poc/internal/router"
+	"github.com/harrisonju123/mcp-agent-poc/internal/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"log"
@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	r := router.New()
+	r := router.NewRouter(nil)
 	r.Replace([]router.Tool{{
 		Name:        "echo",
 		Description: "Return args unchanged",

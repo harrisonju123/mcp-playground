@@ -1,55 +1,58 @@
 package router
 
 import (
-	"sync"
+	"context"
+	"sync/atomic"
+	"unsafe"
 )
-
-type Router struct {
-	mu    sync.RWMutex
-	tools map[string]Tool
-}
 
 type ErrNotFound struct{ Tool string }
 
 func (e ErrNotFound) Error() string {
 	return "tool not found: " + e.Tool
 }
-func New() *Router { return &Router{tools: make(map[string]Tool)} }
 
-// Replace Hot swap in a single swap, new map and overwrite pointer
-// no partial updates, no in place deletions
-func (r *Router) Replace(tools []Tool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.tools = make(map[string]Tool, len(tools))
-	for _, t := range tools {
-		r.tools[t.Name] = t
-	}
+type mapPtr = unsafe.Pointer
+
+type Router struct {
+	table mapPtr
 }
 
-// List reads concurrently and copies the map into a slice to iterate without holding lock
-func (r *Router) List() []Tool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func NewRouter(tools []Tool) *Router {
+	r := &Router{}
+	r.Replace(tools)
+	return r
+}
 
-	out := make([]Tool, 0, len(r.tools))
-	for _, t := range r.tools {
+// Replace atomically swaps in a brand new map.
+// No partial updates, callers will never observe an intermediate state.
+func (r *Router) Replace(tools []Tool) {
+	m := make(map[string]Tool, len(tools))
+	for _, t := range tools {
+		m[t.Name] = t
+	}
+	atomic.StorePointer(&r.table, unsafe.Pointer(&m))
+}
+
+// List returns a snapshot slice ( read only to callers)
+func (r *Router) List() []Tool {
+	tab := *(*map[string]Tool)(atomic.LoadPointer(&r.table))
+
+	out := make([]Tool, 0, len(tab))
+	for _, t := range tab {
 		out = append(out, t)
 	}
 
 	return out
 }
 
-// Call calls a tool by getting read lock, fetch tool, release lock before handler execution.
-// hot swap still valid since Tool values are copied.
-func (r *Router) Call(name string, args []byte) ([]byte, error) {
-	r.mu.RLock()
-	h, ok := r.tools[name]
-	r.mu.RUnlock()
-
+// Call looks up the tool without locks; safe becauase map is immutable
+func (r *Router) Call(ctx context.Context, name string, in []byte) ([]byte, error) {
+	tab := *(*map[string]Tool)(atomic.LoadPointer(&r.table))
+	t, ok := tab[name]
 	if !ok {
 		return nil, ErrNotFound{name}
 	}
 
-	return h.Handler(args)
+	return t.Call(ctx, in)
 }
