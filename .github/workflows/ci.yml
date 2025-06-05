@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Go
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - run: go test ./...
+      - run: go vet ./...
+
+      # Node
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'pnpm' }
+      - run: |
+          cd web
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # Docker build smoke check
+      - run: docker build -f Dockerfile.daemon -t mcpxd:ci .

@@ -1,0 +1,13 @@
+# Go
+/bin/
+/pkg/
+
+# Node
+web/.next
+web/node_modules
+
+# Misc
+.DS_Store
+.env
+.idea
+conf.env
