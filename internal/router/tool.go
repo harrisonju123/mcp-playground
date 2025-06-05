@@ -1,6 +1,8 @@
 package router
 
-import "context"
+import (
+	"context"
+)
 
 type Handler func([]byte) ([]byte, error)
 
@@ -10,6 +12,8 @@ type Tool struct {
 	Handler     Handler
 }
 
-func (t Tool) Call(_ context.Context, in []byte) ([]byte, error) {
-	return t.Handler(in)
+func (t Tool) ID() string {
+	return t.Name
 }
+
+func (t Tool) Call(_ context.Context, in []byte) ([]byte, error) { return t.Handler(in) }

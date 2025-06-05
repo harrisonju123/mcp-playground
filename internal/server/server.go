@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	pb "github.com/harrisonju123/mcp-agent-poc/api/gen"
-	"github.com/harrisonju123/mcp-agent-poc/router"
+	"github.com/harrisonju123/mcp-agent-poc/internal/router"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )

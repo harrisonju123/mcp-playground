@@ -1,7 +1,7 @@
 package router_test
 
 import (
-	"github.com/harrisonju123/mcp-agent-poc/router"
+	"github.com/harrisonju123/mcp-agent-poc/internal/router"
 	"testing"
 )
 
