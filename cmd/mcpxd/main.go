@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	r := router.New()
+	r := router.NewRouter(nil)
 	r.Replace([]router.Tool{{
 		Name:        "echo",
 		Description: "Return args unchanged",
