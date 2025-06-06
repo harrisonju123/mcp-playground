@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/harrisonju123/mcp-agent-poc/config"
+	"github.com/harrisonju123/mcp-agent-poc/internal/metrics"
 	"github.com/harrisonju123/mcp-agent-poc/internal/router"
 	"github.com/harrisonju123/mcp-agent-poc/internal/server"
+	"github.com/harrisonju123/mcp-agent-poc/internal/telemetry"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +19,19 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// register metrics
+	metrics.Register()
+	go func() {
+		log.Printf("prometheus :9100/metrics")
+		err := http.ListenAndServe(":9100", promhttp.Handler())
+		if err != nil {
+			log.Fatalf("prometheus server failed: %v", err)
+		}
+	}()
+
+	shutdown := telemetry.Init(ctx, "mcpxd")
+	defer shutdown(ctx)
 
 	r := router.NewRouter(nil)
 	r.Replace([]router.Tool{{

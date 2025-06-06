@@ -3,6 +3,8 @@ package health
 import (
 	"context"
 	"fmt"
+	"github.com/harrisonju123/mcp-agent-poc/internal/metrics"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -26,16 +28,26 @@ var (
 )
 
 func (b *Breaker) Call(ctx context.Context, c Callable, in []byte) ([]byte, error) {
-	now := time.Now()
-	if trip := b.tripUntil.Load(); trip != 0 && now.UnixNano() < trip {
+	start := time.Now()
+	log.Printf("call start...")
+	if trip := b.tripUntil.Load(); trip != 0 && start.UnixNano() < trip {
 		return nil, fmt.Errorf("breaker open for %s", c.ID())
 	}
 
+	// Metrics
+	code := "ok"
 	out, err := c.Call(ctx, in)
-	b.r.Observe(time.Since(now), err)
+	if err != nil {
+		code = "error"
+	}
+	lat := time.Since(start).Seconds()
+	metrics.ToolLatency.WithLabelValues(c.ID(), code).Observe(lat)
+	metrics.ToolTotal.WithLabelValues(c.ID(), code).Inc()
+
+	b.r.Observe(time.Since(start), err)
 
 	if b.shouldTrip() {
-		b.tripUntil.Store(now.Add(probeInterval).UnixNano())
+		b.tripUntil.Store(start.Add(probeInterval).UnixNano())
 		go b.probe(c)
 	}
 	return out, err
