@@ -5,4 +5,4 @@ Mono-repo for an MCP agent
 
 * **cmd/mcpxd** – Go aggregator daemon placeholder  
 * **web/** – Next.js dev console  
-* Apache-2.0 license (core remains permissive)
+* Apache-2.0 license 
