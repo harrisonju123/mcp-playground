@@ -1,25 +1,26 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
-	pb "github.com/harrisonju123/mcp-agent-poc/api/gen"
 	"github.com/harrisonju123/mcp-agent-poc/config"
 	"github.com/harrisonju123/mcp-agent-poc/internal/router"
 	"github.com/harrisonju123/mcp-agent-poc/internal/server"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"log"
-	"net"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	r := router.NewRouter(nil)
 	r.Replace([]router.Tool{{
 		Name:        "echo",
 		Description: "Return args unchanged",
-		Handler: func(in []byte) ([]byte, error) {
-			// validate if json
+		Handler: func(ctx context.Context, in []byte) ([]byte, error) {
 			var v any
 			if err := json.Unmarshal(in, &v); err != nil {
 				return nil, err
@@ -27,18 +28,18 @@ func main() {
 			return in, nil
 		},
 	}})
+
+	//  watch tools
+	go func() {
+		if err := config.NewWatcher("../../config/tools.yaml", r).Run(ctx); err != nil {
+			log.Fatalf("config watcher failed: %v", err)
+		}
+	}()
+
 	cfg := config.Load()
-	lis, _ := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
-	s := grpc.NewServer()
-	pb.RegisterAggregatorServer(s, server.New(r))
-	if cfg.EnableReflection {
-		reflection.Register(s)
+	log.Printf("starting gRPC on port=%d (reflection=%v)", cfg.Port, cfg.EnableReflection)
+	// start gRPC server
+	if err := server.Start(ctx, r, cfg); err != nil {
+		log.Fatalf("grpc server: %v", err)
 	}
-
-	log.Printf("port=%d reflection=%v registry=%s",
-		cfg.Port, cfg.EnableReflection, cfg.RegistryURL)
-	if err := s.Serve(lis); err != nil {
-		log.Fatal(err)
-	}
-
 }

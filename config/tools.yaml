@@ -1,0 +1,7 @@
+- name: echo
+  description: return args unchanged
+  command: "local#echo.sh"
+
+- name: slow_echo
+  description: sleep 2s then echo
+  command: "local#slow_echo.sh"
