@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------
 
 # 1) List every Go module directory that should be vetted / tested.
-GO_MODULES := $(shell go work edit -json | jq -r '.Use[].DiskPath')
+GO_MODULES := .
 
 # 2) Name of the daemon binary and Docker image tag
 GO_BIN      := mcpxd
@@ -59,5 +59,13 @@ gen:
       --go_out=api/gen --go_opt=paths=source_relative \
       --go-grpc_out=api/gen --go-grpc_opt=paths=source_relative \
       api/aggregator.proto
+
+e2e:
+	docker compose -f infra/docker-compose.yml up --build -d
+	sleep 5             # warm-up
+	k6 run test/e2e/k6.js
+	./scripts/failover.sh
+	k6 run test/e2e/k6.js
+	docker compose -f infra/docker-compose.yml down -v
 
 .DEFAULT_GOAL := dev

@@ -1,0 +1,22 @@
+name: e2e
+
+on: [push, pull_request]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-22.04
+    services:
+      docker: # gives privileged DinD
+        image: docker:24-dind
+        privileged: true
+        options: --dns 8.8.8.8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+
+      - name: Install k6 & jq & bc
+        run: apk add --no-cache k6 jq bc gcompat
+
+      - name: Run integration test
+        run: make e2e

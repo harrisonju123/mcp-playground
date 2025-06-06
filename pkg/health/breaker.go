@@ -34,7 +34,6 @@ func (b *Breaker) Call(ctx context.Context, c Callable, in []byte) ([]byte, erro
 		return nil, fmt.Errorf("breaker open for %s", c.ID())
 	}
 
-	// Metrics
 	code := "ok"
 	out, err := c.Call(ctx, in)
 	if err != nil {
@@ -44,22 +43,33 @@ func (b *Breaker) Call(ctx context.Context, c Callable, in []byte) ([]byte, erro
 	metrics.ToolLatency.WithLabelValues(c.ID(), code).Observe(lat)
 	metrics.ToolTotal.WithLabelValues(c.ID(), code).Inc()
 
+	// feed results to EWMA recorder
 	b.r.Observe(time.Since(start), err)
 
+	// if our latency is too slow, trip the circuit breaker
 	if b.shouldTrip() {
-		b.tripUntil.Store(start.Add(probeInterval).UnixNano())
-		go b.probe(c)
+		// only set a new trip window if we're not already tripped
+		if old := b.tripUntil.Load(); old == 0 || start.UnixNano() >= old {
+			b.tripUntil.Store(start.Add(probeInterval).UnixNano())
+			go b.probe(c)
+		}
 	}
 	return out, err
 }
 
 func (b *Breaker) probe(c Callable) {
+	// wait for interval to elapse
 	time.Sleep(probeInterval)
+
+	// check health, if no error, assume it's healthy
 	_, err := c.Call(context.Background(), nil)
-	if err != nil {
+	if err == nil {
+		// success so clear tripUntil to close the breaker
 		b.tripUntil.Store(0) // closes breaker
 	} else {
+		// failture so keep it open for another probeInterval
 		b.tripUntil.Store(time.Now().Add(probeInterval).UnixNano())
+		go b.probe(c)
 	}
 }
 

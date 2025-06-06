@@ -1,9 +1,16 @@
-FROM golang:1.24 as builder
-WORKDIR /src
-COPY . .
-RUN go build -o /bin/mcpxd ./cmd/mcpxd
+# Build stage: use Alpine to produce a statically linked binary
+FROM golang:1.24-alpine AS builder
 
-FROM gcr.io/distroless/base-debian11
-COPY --from=builder /bin/mcpxd /mcpxd
-EXPOSE 50051
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /mcpxd ./cmd/mcpxd
+
+# Final stage: use scratch to run the static binary
+FROM scratch
+
+COPY --from=builder /mcpxd /mcpxd
+COPY --from=builder /app/config /config
 ENTRYPOINT ["/mcpxd"]

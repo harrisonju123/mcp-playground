@@ -2,14 +2,20 @@ package config
 
 import (
 	"context"
+	tp "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/harrisonju123/mcp-agent-poc/internal/router"
 )
+
+var toxCli = tp.NewClient("http://toxiproxy:8474")
 
 type Watcher struct {
 	path   string
@@ -68,14 +74,35 @@ func (w *Watcher) loadAndSwap() error {
 	}
 	tools := make([]router.Tool, 0, len(cfg))
 	for _, c := range cfg {
-		tools = append(tools, newToolFromConf(c))
+		tool, err := newToolFromConf(c)
+		if err != nil {
+			return err
+		}
+		tools = append(tools, tool)
 	}
 
 	w.router.Replace(tools)
 	return nil
 }
 
-func newToolFromConf(tc ToolConf) router.Tool {
+func newToolFromConf(tc ToolConf) (router.Tool, error) {
+	target := tc.Command
+	if strings.HasPrefix(target, "toxiproxy://") {
+		up := strings.TrimPrefix(target, "toxiproxy://") // echo1:8080
+		// proxy name is deterministic -> idempotent
+		pxName := "px_" + strings.ReplaceAll(up, ":", "_")
+		listen := "0.0.0.0:" + freePort(pxName)
+
+		// idempotent "create or get"
+		px, err := toxCli.Proxy(pxName)
+		if err != nil {
+			px, err = toxCli.CreateProxy(pxName, listen, up)
+			if err != nil {
+				return router.Tool{}, err
+			}
+		}
+		target = px.Listen // 0.0.0.0:32001
+	}
 	return router.Tool{
 		Name:        tc.Name,
 		Description: tc.Description,
@@ -83,5 +110,11 @@ func newToolFromConf(tc ToolConf) router.Tool {
 			//TODO: execute script/http/grpc
 			return in, nil
 		},
-	}
+	}, nil
+}
+
+func freePort(seed string) string {
+	l, _ := net.Listen("tcp", ":0")
+	defer l.Close()
+	return strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 }

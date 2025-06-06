@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  mcpxd:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+      - "9100:9100"
+    volumes:
+      - ../config/tools.yaml:/app/config/tools.yaml:ro
+    depends_on:
+      - echo1
+      - echo2
+      - otelcol
+
+  echo1:
+    image: hashicorp/http-echo
+    command: ["-listen=:8080", "-text=ok"]
+
+  echo2:
+    image: hashicorp/http-echo
+    command: ["-listen=:8080", "-text=ok"]
+
+  # latency / drop injector
+  toxiproxy:
+    image: shopify/toxiproxy
+    ports:
+      - "8474:8474"      # admin API
+    networks: [default]
+
+  prom:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.99.0
+    command: ["--config", "/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
