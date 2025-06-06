@@ -1,7 +1,7 @@
 
 # MCP Agent POC
 
-Mono-repo for an internal AI-driven ticket-resolution platform.
+Mono-repo for an MCP agent 
 
 * **cmd/mcpxd** – Go aggregator daemon placeholder  
 * **web/** – Next.js dev console  
